@@ -1,218 +1,707 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tesla Store </title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tesla Delivery — One-time Spin</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-o9N1j7k9fX8Xb1bQJ6bXyqkqX+1k4hpwqgUANb5gG+E=" crossorigin=""/>
+
   <style>
-    body {
-      font-family: 'Arial', sans-serif;
-      background-color: #0f1113;
-      color: #e6e6e6;
-      margin: 0;
-      padding: 0;
-      text-align: center;
+    :root{
+      --bg:#0b0d0f;
+      --card:#0f1416;
+      --muted:#99a0a6;
+      --accent:#d40000;
+      --accent-2:#ff4d4d;
+      --glass: rgba(255,255,255,0.03);
+      --success:#2ecc71;
     }
-    h1 { color: #d40000; margin-top: 20px; }
-    input, select, button {
-      padding: 10px; margin: 8px; border-radius: 6px; border: none;
-      font-size: 16px;
+    *{box-sizing:border-box}
+    html,body{height:100%; margin:0; background:linear-gradient(180deg,#060708 0%, #071018 100%); color:#e8eef2; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    .app {
+      max-width:1100px; margin:24px auto; padding:20px; position:relative;
     }
-    button {
-      background: #d40000; color: #fff; cursor: pointer;
+
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo {
+      width:56px; height:56px; border-radius:12px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; box-shadow:0 6px 20px rgba(212,0,0,0.14);
     }
-    button:hover { background: #ff4d4d; }
-    .section { display: none; margin-top: 20px; }
-    .card {
-      background: #1a1d20; padding: 20px; border-radius: 12px;
-      max-width: 600px; margin: 0 auto;
+    h1{ font-size:18px; margin:0;}
+    p.lead{ margin:0; color:var(--muted); font-size:13px; }
+
+    .layout { display:grid; grid-template-columns: 360px 1fr; gap:20px; align-items:start; }
+    @media (max-width:900px){ .layout{ grid-template-columns: 1fr; } .map-column { order:2 } .side-column{ order:1 } }
+
+    /* Card */
+    .card { background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03); padding:18px; border-radius:12px; box-shadow: 0 6px 30px rgba(2,6,8,0.6); }
+
+    /* Form */
+    .field { margin-bottom:12px; text-align:left; }
+    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input[type="text"], input[type="email"], input[type="tel"], select {
+      width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:var(--glass); color:inherit;
+      outline:none; transition:box-shadow .18s, border-color .18s;
     }
+    input:focus, select:focus { box-shadow:0 4px 18px rgba(0,0,0,0.6); border-color: rgba(212,0,0,0.9); }
+
+    .btn {
+      display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; border:none; cursor:pointer;
+      font-weight:600; background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:white;
+    }
+    .btn.secondary { background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--muted); font-weight:600; }
+    .btn.ghost { background:transparent; color:var(--accent); border:1px solid rgba(212,0,0,0.08); }
+
+    /* Dashboard & spin */
+    .welcome { font-size:16px; margin-bottom:6px; font-weight:600; }
+    .muted { color:var(--muted); font-size:13px; }
+
+    .spin-area { display:flex; flex-direction:column; gap:12px; align-items:center; padding:18px 6px; }
+    .wheel {
+      width:220px; height:220px; border-radius:50%; background:conic-gradient(#d40000 0 12.5%, #ffefef 12.5% 25%, #d40000 25% 37.5%, #ffeaea 37.5% 50%, #d40000 50% 62.5%, #fff4f4 62.5% 75%, #d40000 75% 87.5%, #fff8f8 87.5% 100%);
+      display:flex; align-items:center; justify-content:center; box-shadow:0 8px 30px rgba(0,0,0,0.6);
+      transition:transform 2.7s cubic-bezier(.08,.78,.36,1);
+    }
+    .wheel.spin { transform: rotate(1440deg); } /* fallback - rotation is set dynamically in JS */
+    .wheel .center { width:84px; height:84px; border-radius:50%; background:#0b0d0f; display:flex; align-items:center; justify-content:center; color:var(--muted); border:4px solid rgba(255,255,255,0.03); font-weight:700; }
+    .pointer { position:relative; width:18px; height:40px; background:var(--accent); border-radius:6px; transform:translateY(-130px) rotate(0deg); box-shadow:0 6px 18px rgba(0,0,0,0.6); }
+
+    /* Result */
+    .result { font-size:20px; font-weight:700; color:#fff; }
+
+    /* Map */
+    #map { height:680px; border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.03); }
+
+    /* Processing panel */
+    .progress { width:100%; height:12px; background:rgba(255,255,255,0.03); border-radius:999px; overflow:hidden; }
+    .progress > .bar { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); transition:width .8s ease; }
+
     /* Modal */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-      display: none; align-items: center; justify-content: center; z-index: 1000;
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:linear-gradient(rgba(1,1,1,0.6), rgba(1,1,1,0.6)); z-index:1400;
     }
-    .modal-card {
-      background: #0f1113; color: #e6e6e6; border: 1px solid #202427;
-      width: 92%; max-width: 480px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    .modal {
+      width:92%; max-width:520px; background:var(--card); padding:18px; border-radius:12px; border:1px solid rgba(255,255,255,0.03);
     }
-    .modal-header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 16px 20px; border-bottom: 1px solid #202427;
-    }
-    .modal-title { font-weight: 600; }
-    .modal-close {
-      background: transparent; border: none; color: #aaa; font-size: 18px; cursor: pointer;
-    }
-    .modal-body { padding: 18px 20px; }
-    .modal-actions { padding: 16px 20px; text-align: right; }
-    .btn-secondary {
-      background: #202427; color: #e6e6e6; border: 1px solid #2b2f33;
-      padding: 10px 16px; border-radius: 8px; cursor: pointer;
-    }
-    .btn-secondary:hover { border-color: #d40000; color: #fff; }
-    /* Progress */
-    .progress { width: 100%; height: 10px; background: #1a1d20; border-radius: 8px; overflow: hidden; }
-    .progress-bar { height: 100%; background: linear-gradient(90deg, #d40000, #ff4d4d); width: 0%; transition: width 0.6s ease; }
+    .modal h3{ margin:0 0 6px 0; }
+    .modal .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+
+    /* Small helper */
+    .row { display:flex; gap:8px; align-items:center; }
+    .muted-sm { font-size:12px; color:var(--muted); }
+
+    footer { margin-top:18px; text-align:center; color:var(--muted); font-size:13px; }
   </style>
 </head>
 <body>
-  <h1>🚗 Tesla Store</h1>
-
-  <!-- Registration -->
-  <div id="registration" class="section" style="display:block;">
-    <div class="card">
-      <h2>Register</h2>
-      <input id="nameInput" placeholder="Enter your name"/>
-      <button onclick="register()">Submit</button>
-    </div>
-  </div>
-
-  <!-- Dashboard -->
-  <div id="dashboard" class="section">
-    <div class="card">
-      <h2 id="welcome"></h2>
-      <button onclick="startSpin()">🎡 Spin Now</button>
-    </div>
-  </div>
-
-  <!-- Spin Result -->
-  <div id="resultSection" class="section">
-    <div class="card">
-      <h3>You won: <span id="prize"></span></h3>
-      <button onclick="claimPrize()">Claim</button>
-      <button onclick="convertCash()">Convert to Cash</button>
-    </div>
-  </div>
-
-  <!-- Delivery Form -->
-  <div id="deliveryForm" class="section">
-    <div class="card">
-      <h3>Delivery Information</h3>
-      <input placeholder="Enter your location"/>
-      <button onclick="startProcessing('deliver')">Submit</button>
-    </div>
-  </div>
-
-  <!-- Withdraw Form -->
-  <div id="withdrawForm" class="section">
-    <div class="card">
-      <h3>Withdraw Cash</h3>
-      <select>
-        <option>USD</option>
-        <option>EUR</option>
-        <option>NGN</option>
-      </select><br/>
-      <input placeholder="Bank Account Number"/>
-      <button onclick="startProcessing('withdraw')">Withdraw</button>
-    </div>
-  </div>
-
-  <!-- Processing -->
-  <div id="processingPanel" class="section">
-    <div class="card">
-      <h3 id="processingTitle">Processing</h3>
-      <div class="progress"><div id="progressBar" class="progress-bar"></div></div>
-      <p id="processingStatus">Initializing…</p>
-    </div>
-  </div>
-
-  <!-- Modal -->
-  <div id="teslaModal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span class="modal-title">Processing issue</span>
-        <button class="modal-close" onclick="closeTeslaModal()">✕</button>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">TS</div>
+        <div>
+          <h1>Tesla Delivery</h1>
+          <p class="lead">Realistic delivery app demo — free one-time spin for new users</p>
+        </div>
       </div>
-      <div class="modal-body">
-        <p id="modalMessage">An activation code is required to continue.</p>
+      <div class="row">
+        <div id="userBadge" class="muted-sm">Not registered</div>
+        <button id="resetBtn" class="btn secondary" style="display:none">Reset demo</button>
       </div>
-      <div class="modal-actions">
-        <button class="btn-secondary" onclick="closeTeslaModal()">Dismiss</button>
+    </header>
+
+    <div class="layout">
+      <!-- Left column: registration / dashboard / controls -->
+      <div class="side-column">
+        <!-- Registration -->
+        <section id="registrationCard" class="card" aria-labelledby="regTitle">
+          <h2 id="regTitle">Create account</h2>
+          <p class="muted">Register to receive a one-time free spin and access delivery options.</p>
+
+          <div class="field">
+            <label for="fullName">Full name</label>
+            <input id="fullName" type="text" placeholder="Jane Doe" autocomplete="name" />
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" placeholder="you@company.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="phone">Phone</label>
+            <input id="phone" type="tel" placeholder="+1 555 555 5555" autocomplete="tel" />
+          </div>
+          <div class="field">
+            <label for="country">Country</label>
+            <select id="country">
+              <option value="">Choose country</option>
+              <option>United States</option><option>United Kingdom</option><option>Canada</option><option>Australia</option><option>Germany</option><option>France</option><option>Spain</option><option>Italy</option><option>Netherlands</option><option>Sweden</option><option>Norway</option><option>Denmark</option><option>Finland</option><option>Belgium</option><option>Switzerland</option><option>Austria</option><option>Portugal</option><option>Ireland</option><option>Brazil</option><option>Mexico</option><option>Japan</option><option>China</option><option>India</option><option>South Korea</option><option>Singapore</option><option>Hong Kong</option><option>New Zealand</option><option>United Arab Emirates</option><option>Saudi Arabia</option><option>Israel</option><option>Thailand</option><option>Indonesia</option><option>Malaysia</option><option>Philippines</option><option>Vietnam</option>
+            </select>
+          </div>
+
+          <div style="display:flex; gap:10px;">
+            <button id="registerBtn" class="btn">Create account</button>
+            <button id="quickDemo" class="btn secondary">Quick demo</button>
+          </div>
+        </section>
+
+        <!-- Dashboard -->
+        <section id="dashboardCard" class="card" style="display:none; margin-top:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div class="welcome" id="welcomeText">Welcome,</div>
+              <div class="muted" id="emailText"></div>
+            </div>
+            <div>
+              <div id="spinStatus" class="muted-sm">Spin available</div>
+            </div>
+          </div>
+
+          <hr style="border:0;border-top:1px solid rgba(255,255,255,0.03); margin:14px 0">
+
+          <div class="spin-area">
+            <div class="pointer" aria-hidden="true"></div>
+            <div id="wheel" class="wheel" role="img" aria-label="Prize wheel">
+              <div class="center">SPIN</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button id="spinBtn" class="btn">🎡 Spin now</button>
+              <button id="viewHistory" class="btn secondary">History</button>
+            </div>
+            <div class="muted-sm">One free spin per account. Prizes are simulated for demo purposes.</div>
+          </div>
+        </section>
+
+        <!-- Result / Claim -->
+        <section id="resultCard" class="card" style="display:none; margin-top:16px;">
+          <h3>Congratulations</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between; gap:10px;">
+            <div>
+              <div class="result" id="prizeText">You won: —</div>
+              <div class="muted-sm" id="prizeNote">Select how you'd like to redeem.</div>
+            </div>
+            <div>
+              <button id="claimBtn" class="btn">Claim delivery</button>
+              <button id="convertBtn" class="btn secondary">Convert to cash</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Withdraw form -->
+        <section id="withdrawCard" class="card" style="display:none; margin-top:16px;">
+          <h3>Withdraw convert to cash</h3>
+          <div class="muted-sm" style="margin-bottom:12px;">Choose destination currency and bank details for payout.</div>
+          <div class="field">
+            <label for="currency">Currency</label>
+            <select id="currency">
+              <option>USD</option><option>EUR</option><option>GBP</option><option>CAD</option><option>AUD</option><option>JPY</option><option>CNY</option><option>INR</option><option>BRL</option><option>MXN</option><option>ZAR</option><option>SEK</option><option>NOK</option><option>DKK</option><option>CHF</option><option>HKD</option><option>SGD</option><option>NZD</option><option>KRW</option><option>TRY</option><option>PLN</option><option>CZK</option><option>HUF</option><option>RUB</option><option>AED</option><option>SAR</option><option>ILS</option><option>THB</option><option>IDR</option><option>MYR</option><option>PHP</option><option>VND</option><option>COP</option><option>ARS</option><option>CLP</option>
+            </select>
+          </div>
+          <div class="field"><label for="bankAccount">Bank account / payout ID</label><input id="bankAccount" type="text" placeholder="Account number / IBAN / Pay ID"></div>
+          <div style="display:flex;gap:8px;">
+            <button id="withdrawSubmit" class="btn">Withdraw</button>
+            <button class="btn secondary" onclick="backToDashboard()">Cancel</button>
+          </div>
+        </section>
+
+        <!-- Processing -->
+        <section id="processingCard" class="card" style="display:none; margin-top:16px;">
+          <h3 id="processingTitle">Processing</h3>
+          <div style="margin:12px 0;">
+            <div class="progress"><div id="progressBar" class="bar"></div></div>
+            <div class="muted-sm" id="processingText" style="margin-top:8px;">Starting…</div>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:8px;">
+            <div class="muted-sm" id="processEta">ETA: ~30s</div>
+            <div><button class="btn ghost" onclick="cancelProcessing()">Cancel</button></div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Right column: map and delivery form -->
+      <div class="map-column">
+        <div id="map" class="card"></div>
+
+        <div style="display:flex; gap:10px; margin-top:12px;">
+          <button id="locateBtn" class="btn secondary" title="Center map on your location">Locate me</button>
+          <button id="resetMarker" class="btn secondary" title="Remove selected delivery point">Clear point</button>
+          <div style="flex:1"></div>
+          <div id="mapHint" class="muted-sm">Click the map to pick a delivery location.</div>
+        </div>
+
+        <!-- Delivery details form -->
+        <section id="deliveryDetails" class="card" style="margin-top:12px; display:none;">
+          <h3>Delivery details</h3>
+          <p class="muted-sm">Selected address is auto-filled from the map. Confirm and continue.</p>
+
+          <div class="field"><label for="addressField">Address</label><input id="addressField" type="text" placeholder="Click on map to select address" /></div>
+          <div class="field" style="display:flex; gap:8px;">
+            <div style="flex:1">
+              <label for="cityField">City</label>
+              <input id="cityField" type="text" placeholder="City">
+            </div>
+            <div style="width:140px">
+              <label for="postalField">Postal</label>
+              <input id="postalField" type="text" placeholder="ZIP / Postal">
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="deliverSubmit" class="btn">Confirm delivery</button>
+            <button class="btn secondary" onclick="backToDashboard()">Cancel</button>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <footer>
+      Demo app · Simulated delivery flow · Map powered by OpenStreetMap & Leaflet
+    </footer>
+  </div>
+
+  <!-- Modal overlay -->
+  <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+      <h3 id="modalTitle">Verification required</h3>
+      <p id="modalBody">To continue we need a short verification code. For demo use <strong>123456</strong>.</p>
+
+      <div id="modalInputBlock" style="margin-top:8px;">
+        <label for="activationCode" class="muted-sm">Enter code</label>
+        <input id="activationCode" type="text" placeholder="Enter code" />
+      </div>
+
+      <div class="actions">
+        <button id="modalCancel" class="btn secondary">Dismiss</button>
+        <button id="modalConfirm" class="btn">Verify</button>
       </div>
     </div>
   </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-p3bGgqCqk0r3s6f5kqYVur2qBND3fQ4j0w4c1p8aRk8=" crossorigin=""></script>
 
   <script>
-    const prizes = ["Cybertruck","Model S","$50,000","$30,000","VIP Ticket 🎫","Better luck next time"];
-    let processingTimer;
+    // App state, persisted to localStorage for demo realism
+    const STATE_KEY = 'tesla_demo_state_v1';
+    const prizes = ["Cybertruck", "Model S", "$50,000", "$30,000", "VIP Event Ticket", "Delivery Voucher", "Better luck next time"];
+    let state = {
+      user: null,
+      spinUsed: false,
+      lastPrize: null,
+      processing: false,
+      marker: null
+    };
 
-    function register(){
-      const name = document.getElementById("nameInput").value;
-      if(name){
-        document.getElementById("registration").style.display="none";
-        document.getElementById("dashboard").style.display="block";
-        document.getElementById("welcome").innerText = `Welcome, ${name}!`;
+    // Bootstrap
+    document.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      initUI();
+      initMap();
+    });
+
+    function loadState(){
+      try {
+        const saved = localStorage.getItem(STATE_KEY);
+        if(saved) state = JSON.parse(saved);
+      } catch(e) { console.warn('Failed to parse state', e); }
+    }
+    function saveState(){ localStorage.setItem(STATE_KEY, JSON.stringify(state)); updateUI(); }
+
+    // UI elements
+    const registrationCard = document.getElementById('registrationCard');
+    const dashboardCard = document.getElementById('dashboardCard');
+    const resultCard = document.getElementById('resultCard');
+    const withdrawCard = document.getElementById('withdrawCard');
+    const processingCard = document.getElementById('processingCard');
+    const deliveryDetails = document.getElementById('deliveryDetails');
+
+    const registerBtn = document.getElementById('registerBtn');
+    const quickDemo = document.getElementById('quickDemo');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const spinBtn = document.getElementById('spinBtn');
+    const wheel = document.getElementById('wheel');
+    const prizeText = document.getElementById('prizeText');
+    const claimBtn = document.getElementById('claimBtn');
+    const convertBtn = document.getElementById('convertBtn');
+
+    const registerFields = {
+      name: document.getElementById('fullName'),
+      email: document.getElementById('email'),
+      phone: document.getElementById('phone'),
+      country: document.getElementById('country')
+    };
+
+    const processingTitle = document.getElementById('processingTitle');
+    const progressBar = document.getElementById('progressBar');
+    const processingText = document.getElementById('processingText');
+
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalConfirm = document.getElementById('modalConfirm');
+    const modalCancel = document.getElementById('modalCancel');
+    const activationCode = document.getElementById('activationCode');
+
+    document.getElementById('registerBtn').addEventListener('click', handleRegister);
+    document.getElementById('quickDemo').addEventListener('click', ()=> {
+      registerFields.name.value = 'Demo User';
+      registerFields.email.value = 'demo@example.com';
+      registerFields.phone.value = '+1 555 555 5555';
+      registerFields.country.value = 'United States';
+      handleRegister();
+    });
+    resetBtn.addEventListener('click', resetDemo);
+
+    spinBtn.addEventListener('click', handleSpin);
+    claimBtn.addEventListener('click', handleClaim);
+    convertBtn.addEventListener('click', () => { showWithdraw(); });
+
+    document.getElementById('withdrawSubmit').addEventListener('click', () => {
+      // Basic validation
+      const acc = document.getElementById('bankAccount').value.trim();
+      if(!acc){ alert('Please enter an account or payout ID'); return; }
+      startProcessing('withdraw');
+    });
+
+    document.getElementById('deliverSubmit').addEventListener('click', () => {
+      const address = document.getElementById('addressField').value.trim();
+      if(!address){ alert('Please select a delivery location on the map or fill the address.'); return; }
+      startProcessing('deliver');
+    });
+
+    modalCancel.addEventListener('click', closeModal);
+    modalConfirm.addEventListener('click', () => {
+      // Demo activation code is 123456
+      if(activationCode.value.trim() === '123456'){
+        closeModal();
+        continueProcessingAfterVerification();
+      } else {
+        alert('Incorrect code for demo. Use 123456');
+      }
+    });
+
+    // Map init
+    let map, markerLayer, selectedMarker = null;
+    function initMap(){
+      map = L.map('map', { zoomControl:true, attributionControl:true }).setView([20, 0], 2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      markerLayer = L.layerGroup().addTo(map);
+
+      map.on('click', async (e) => {
+        setMarker(e.latlng.lat, e.latlng.lng, true);
+      });
+
+      document.getElementById('locateBtn').addEventListener('click', () => {
+        if(navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition((pos) => {
+            map.setView([pos.coords.latitude, pos.coords.longitude], 14);
+            setMarker(pos.coords.latitude, pos.coords.longitude, true);
+          }, (err) => alert('Location failed: ' + err.message));
+        } else alert('Geolocation not supported');
+      });
+
+      document.getElementById('resetMarker').addEventListener('click', () => {
+        clearMarker();
+      });
+
+      // load saved marker if present
+      if(state.marker && state.marker.lat){
+        setMarker(state.marker.lat, state.marker.lng, false, state.marker.address);
+        map.setView([state.marker.lat, state.marker.lng], 10);
+      }
+      updateUI();
+    }
+
+    async function setMarker(lat, lng, doReverse = true, presetAddress = ''){
+      markerLayer.clearLayers();
+      selectedMarker = L.marker([lat, lng], { draggable:true }).addTo(markerLayer);
+      selectedMarker.on('dragend', (ev) => {
+        const p = ev.target.getLatLng();
+        setMarker(p.lat, p.lng, true);
+      });
+
+      state.marker = { lat, lng };
+      saveState();
+
+      if(doReverse){
+        try {
+          const addr = await reverseGeocode(lat, lng);
+          fillAddressForm(addr);
+          state.marker.address = addr.display_name || '';
+        } catch(e){
+          if(presetAddress) fillAddressForm({ display_name: presetAddress });
+          else fillAddressForm({ display_name: `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
+          console.warn('Reverse geocode failed', e);
+        }
+      } else {
+        fillAddressForm({ display_name: presetAddress || '' });
+      }
+
+      deliveryDetails.style.display = 'block';
+    }
+
+    function clearMarker(){
+      markerLayer.clearLayers();
+      state.marker = null;
+      saveState();
+      deliveryDetails.style.display = 'none';
+      document.getElementById('addressField').value = '';
+      document.getElementById('cityField').value = '';
+      document.getElementById('postalField').value = '';
+    }
+
+    function fillAddressForm(addr){
+      document.getElementById('addressField').value = addr.display_name || '';
+      // try to parse city/postcode from address components if available
+      if(addr.address){
+        document.getElementById('cityField').value = addr.address.city || addr.address.town || addr.address.village || addr.address.county || '';
+        document.getElementById('postalField').value = addr.address.postcode || '';
+      } else {
+        document.getElementById('cityField').value = '';
+        document.getElementById('postalField').value = '';
       }
     }
 
-    function startSpin(){
-      const prize = prizes[Math.floor(Math.random()*prizes.length)];
-      document.getElementById("dashboard").style.display="none";
-      document.getElementById("resultSection").style.display="block";
-      document.getElementById("prize").innerText = prize;
+    async function reverseGeocode(lat, lng){
+      // Nominatim reverse geocoding (lightweight demo use); in production use your own geocoding service with rate limits respected.
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if(!res.ok) throw new Error('Reverse geocode failed');
+      const data = await res.json();
+      return data;
     }
 
-    function claimPrize(){
-      document.getElementById("resultSection").style.display="none";
-      document.getElementById("deliveryForm").style.display="block";
+    // Registration & UI
+    function handleRegister(){
+      const name = registerFields.name.value.trim();
+      const email = registerFields.email.value.trim();
+      const phone = registerFields.phone.value.trim();
+      const country = registerFields.country.value.trim();
+
+      if(!name || !email){ alert('Please provide a name and email.'); return; }
+      // Simple email validation
+      if(!/^\S+@\S+\.\S+$/.test(email)){ alert('Please provide a valid email.'); return; }
+
+      state.user = { name, email, phone, country, registeredAt: new Date().toISOString() };
+      saveState();
+      updateUI();
     }
 
-    function convertCash(){
-      document.getElementById("resultSection").style.display="none";
-      document.getElementById("withdrawForm").style.display="block";
+    function updateUI(){
+      if(state.user){
+        registrationCard.style.display = 'none';
+        dashboardCard.style.display = 'block';
+        document.getElementById('welcomeText').innerText = `Welcome, ${state.user.name}`;
+        document.getElementById('emailText').innerText = `${state.user.email} • ${state.user.country || ''}`;
+        document.getElementById('userBadge').innerText = state.user.name;
+        resetBtn.style.display = 'inline-flex';
+      } else {
+        registrationCard.style.display = 'block';
+        dashboardCard.style.display = 'none';
+        resetBtn.style.display = 'none';
+        document.getElementById('userBadge').innerText = 'Not registered';
+      }
+
+      // Spin button state
+      const used = !!state.spinUsed;
+      spinBtn.disabled = used;
+      document.getElementById('spinStatus').innerText = used ? 'Spin used' : 'Spin available';
+
+      // Show last prize card if exists
+      if(state.lastPrize){
+        prizeText.innerText = `You won: ${state.lastPrize}`;
+        resultCard.style.display = 'block';
+      } else {
+        resultCard.style.display = 'none';
+      }
+
+      // Processing state
+      if(state.processing){
+        processingCard.style.display = 'block';
+      } else {
+        processingCard.style.display = 'none';
+      }
     }
 
+    function resetDemo(){
+      if(!confirm('Reset demo state? This clears registration, spin usage and selected marker.')) return;
+      state = { user:null, spinUsed:false, lastPrize:null, processing:false, marker:null };
+      localStorage.removeItem(STATE_KEY);
+      updateUI();
+      clearMarker();
+      map.setView([20,0],2);
+    }
+
+    // Wheel / spin logic (visual)
+    function handleSpin(){
+      if(!state.user){ alert('Please register first.'); return; }
+      if(state.spinUsed){ alert('Spin already used.'); return; }
+
+      // Randomly pick prize and do a nice rotation effect
+      const idx = Math.floor(Math.random()*prizes.length);
+      const prize = prizes[idx];
+      state.spinUsed = true;
+      state.lastPrize = prize;
+      saveState();
+
+      // Calculate rotation to land on a certain wedge. For simplicity, wheel has 8 wedges.
+      const wedges = prizes.length;
+      const wedgeAngle = 360 / wedges;
+      // Land center of the wedge
+      const targetAngle = (360 * 6) + (360 - (idx * wedgeAngle + wedgeAngle/2)); // two turns + target
+      wheel.style.transition = 'transform 4s cubic-bezier(.2,.94,.28,1)';
+      wheel.style.transform = `rotate(${targetAngle}deg)`;
+      spinBtn.disabled = true;
+
+      // After animation ends
+      setTimeout(()=> {
+        // Show result panel
+        prizeText.innerText = `You won: ${prize}`;
+        resultCard.style.display = 'block';
+        // reset wheel transform (visual continuity)
+        wheel.style.transition = '';
+        wheel.style.transform = '';
+        // update UI states
+        updateUI();
+      }, 4200);
+    }
+
+    // Claim / Convert flows
+    function handleClaim(){
+      // Show delivery form and center map for selection
+      resultCard.style.display = 'none';
+      deliveryDetails.style.display = state.marker ? 'block' : 'block';
+      // show hint to pick a point
+      if(!state.marker) alert('Click on the map to pick a delivery point for your prize.');
+    }
+
+    function showWithdraw(){
+      resultCard.style.display = 'none';
+      withdrawCard.style.display = 'block';
+      // hide after a short while if needed
+    }
+
+    function backToDashboard(){
+      withdrawCard.style.display = 'none';
+      resultCard.style.display = 'none';
+      deliveryDetails.style.display = state.marker ? 'block' : 'none';
+      updateUI();
+    }
+
+    // Processing simulation with verification requirement
+    let processingInterval = null;
     function startProcessing(flow){
-      document.getElementById("deliveryForm").style.display="none";
-      document.getElementById("withdrawForm").style.display="none";
-      document.getElementById("processingPanel").style.display="block";
-      document.getElementById("processingTitle").innerText = flow === 'withdraw' ? 'Processing withdrawal' : 'Processing delivery';
+      // flow = 'withdraw' or 'deliver'
+      processingCard.style.display = 'block';
+      processingTitle.innerText = flow === 'withdraw' ? 'Processing withdrawal' : 'Processing delivery';
+      progressBar.style.width = '4%';
+      processingText.innerText = 'Initializing…';
+      state.processing = true;
+      saveState();
 
       const steps = [
-        { w: 10, s: 'Initializing…' },
-        { w: 30, s: 'Secure verification…' },
-        { w: 55, s: flow === 'withdraw' ? 'Bank routing validation…' : 'Carrier assignment…' },
-        { w: 75, s: flow === 'withdraw' ? 'Compliance checks…' : 'Address validation…' },
-        { w: 90, s: 'Finalizing…' }
+        { pct: 10, text: 'Initializing' },
+        { pct: 30, text: 'Secure verification' },
+        { pct: 55, text: flow === 'withdraw' ? 'Bank routing validation' : 'Carrier assignment' },
+        { pct: 75, text: flow === 'withdraw' ? 'Compliance checks' : 'Address validation' },
+        { pct: 92, text: 'Finalizing' },
       ];
 
       let i = 0;
-      clearInterval(processingTimer);
-      processingTimer = setInterval(() => {
-        const step = steps[i];
-        document.getElementById('progressBar').style.width = step.w + '%';
-        document.getElementById('processingStatus').innerText = step.s;
+      // Ask for verification at step 30 (demo)
+      if(processingInterval) clearInterval(processingInterval);
+      processingInterval = setInterval(()=> {
+        const step = steps[Math.min(i, steps.length-1)];
+        progressBar.style.width = step.pct + '%';
+        processingText.innerText = step.text + '…';
         i++;
 
-        if (step.w === 75) {
-          openTeslaModal(flow === 'withdraw'
-            ? 'Additional verification required to continue your withdrawal.'
-            : 'Additional confirmation required to continue your delivery.');
+        if(step.pct === 30){
+          // Pause and require verification modal
+          openModal('Verification required', 'A short verification code is required to continue. For demo, enter 123456.');
+          // pause advancing until verified
+          clearInterval(processingInterval);
         }
 
-                if (i >= steps.length) {
-          clearInterval(processingTimer);
-          document.getElementById('progressBar').style.width = '100%';
-          document.getElementById('processingStatus').innerText = 'Completed';
-          setTimeout(() => {
-            document.getElementById('processingPanel').style.display = 'none';
-            // Return user to dashboard after processing
-            document.getElementById('dashboard').style.display = 'block';
-          }, 1500);
+        if(i >= steps.length){
+          clearInterval(processingInterval);
+          // complete
+          progressBar.style.width = '100%';
+          processingText.innerText = 'Completed';
+          state.processing = false;
+          saveState();
+          setTimeout(()=> {
+            processingCard.style.display = 'none';
+            alert(flow === 'withdraw' ? 'Withdrawal request submitted (simulated).' : 'Delivery confirmed (simulated).');
+            clearMarker();
+            backToDashboard();
+            updateUI();
+          }, 1000);
         }
       }, 1200);
     }
 
-    function openTeslaModal(message) {
-      document.getElementById('modalMessage').innerText = message || 'An activation code is required to continue.';
-      document.getElementById('teslaModal').style.display = 'flex';
+    function openModal(title, message){
+      document.getElementById('modalTitle').innerText = title;
+      document.getElementById('modalBody').innerText = message;
+      activationCode.value = '';
+      modalOverlay.style.display = 'flex';
+      modalOverlay.setAttribute('aria-hidden','false');
+      activationCode.focus();
+    }
+    function closeModal(){
+      modalOverlay.style.display = 'none';
+      modalOverlay.setAttribute('aria-hidden','true');
+    }
+    function continueProcessingAfterVerification(){
+      // resume the processing interval where it left off
+      // For demo we bump the progress to 40% and continue
+      progressBar.style.width = '40%';
+      processingText.innerText = 'Verification passed…';
+      // resume sequence
+      let localSteps = [
+        { pct: 55, text: 'Next validation' },
+        { pct: 75, text: 'Final checks' },
+        { pct: 92, text: 'Finalizing' },
+      ];
+      let j = 0;
+      processingInterval = setInterval(()=> {
+        const st = localSteps[j];
+        if(!st){ clearInterval(processingInterval); progressBar.style.width='100%'; processingText.innerText='Completed'; state.processing=false; saveState(); setTimeout(()=> { processingCard.style.display='none'; alert('Process completed (simulated).'); backToDashboard(); updateUI(); }, 900); return; }
+        progressBar.style.width = st.pct + '%';
+        processingText.innerText = st.text + '…';
+        j++;
+      }, 1100);
     }
 
-    function closeTeslaModal() {
-      document.getElementById('teslaModal').style.display = 'none';
+    function cancelProcessing(){
+      if(confirm('Cancel processing? This will stop the simulated flow.')) {
+        clearInterval(processingInterval);
+        state.processing = false;
+        saveState();
+        processingCard.style.display = 'none';
+        backToDashboard();
+      }
+    }
+
+    // Small helper functions
+    function show(element){
+      element.style.display = '';
+    }
+    function hide(element){
+      element.style.display = 'none';
+    }
+
+    function initUI(){
+      updateUI();
     }
   </script>
 </body>
 </html>
-
